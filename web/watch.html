@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>터치라인 — 복기와 리포트</title>
+<link rel="stylesheet" href="style.css">
+<script defer src="core.js"></script>
+<script defer src="watch.js"></script>
+<script defer src="watch_boot.js"></script>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="brand"><strong>터치라인</strong><span>같은 선수, 하나의 기록</span></div>
+    <nav class="nav" aria-label="화면 전환">
+      <button type="button" id="tabReview" class="tab active">복기</button>
+      <button type="button" id="tabReport" class="tab needs-pos">리포트</button>
+      <select id="sourceSelect" aria-label="데이터 선택" hidden></select>
+    </nav>
+  </header>
+  <div class="steps"><a href="index.html">영상 목록</a><span>·</span><a id="linkStitch" href="stitch.html">기록 잇기</a><span>·</span><a id="linkCalib" href="calibrate.html">경기장 맞추기</a></div>
+  <p id="sourceNote" class="note"></p>
+  <p class="hint only-no-pos">경기장을 아직 맞추지 않았어요. <a id="hintCalib" href="calibrate.html">경기장 맞추기</a>를 하면 미니맵과 리포트가 열립니다.</p>
+  <p id="loadError" class="error" hidden></p>
+
+  <section class="chips" aria-label="선수 선택">
+    <div class="chips-head"><strong>선수 선택</strong><span>영상이나 미니맵에서 눌러도 선택됩니다</span></div>
+    <div id="chipGroups"></div>
+  </section>
+
+  <main id="viewReview">
+    <section class="card video-card" aria-label="경기 영상">
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" muted playsinline preload="auto"></video>
+        <canvas id="overlay" aria-label="영상 속 선수 박스. 눌러서 선택"></canvas>
+      </div>
+      <div class="controls">
+        <button type="button" id="playBtn" class="btn dark">재생</button>
+        <select id="speed" aria-label="재생 속도"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+        <span id="clock" class="clock">0:00 / 0:00</span>
+        <div class="timeline-box">
+          <div id="timeline" class="timeline" role="slider" tabindex="0" aria-label="재생 위치" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="tlSegments"></div><div id="tlMarks"></div><div id="tlHead" class="tl-head"></div>
+          </div>
+          <div class="legend"><span><i class="lg seg"></i>선택한 선수가 기록된 구간</span><span><i class="lg run"></i>고속 달리기·스프린트</span><span>빈 곳: 기록이 끊긴 구간</span><span id="lgJump" hidden><i class="lg jump"></i>위치가 순간 이동한 지점 (다른 선수로 넘어간 것으로 추정)</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="two">
+      <section class="card" aria-label="확대 화면">
+        <div class="card-head"><h2 id="followTitle">확대 화면</h2><span>선수가 작게 보여서 주변과 함께 확대</span></div>
+        <div class="follow-wrap"><canvas id="follow" width="960" height="540"></canvas><p id="followMsg" class="follow-msg" hidden>이 구간에는 선택한 선수의 기록이 없어요</p></div>
+      </section>
+      <section class="card needs-pos" aria-label="미니맵">
+        <div class="card-head"><h2>미니맵 · 위치와 이동 경로</h2><span>최근 30초 경로</span></div>
+        <canvas id="minimap" width="1050" height="680" aria-label="경기장 위 선수 위치. 눌러서 선택"></canvas>
+        <div class="legend" id="mapLegend"></div>
+      </section>
+    </div>
+
+    <section class="card summary" aria-label="요약">
+      <div class="stat"><span id="sumDistLabel">이동 거리</span><b id="sumDist">–</b></div>
+      <div class="stat needs-pos"><span>최고 속도</span><b id="sumTop">–</b></div>
+      <div class="stat needs-pos"><span>고속 달리기</span><b id="sumHsr">–</b></div>
+      <div class="stat needs-pos"><span>스프린트</span><b id="sumSprint">–</b></div>
+      <button type="button" id="toReport" class="btn green needs-pos">리포트 전체 보기</button>
+    </section>
+  </main>
+
+  <main id="viewReport" hidden>
+    <section class="hero" aria-label="선수 요약">
+      <div><span id="repClip" class="hero-sub"></span><h1 id="repName"></h1></div>
+      <div id="repTitles" class="titles"></div>
+    </section>
+    <section class="advice" aria-label="한 줄 조언">
+      <div><span class="advice-label">한 줄 조언 · 수치로 만든 자동 문장</span><p id="repAdvice"></p></div>
+      <button type="button" id="adviceBtn" class="btn orange">근거 장면 보기</button>
+    </section>
+    <section id="repTiles" class="tiles" aria-label="움직임 지표"></section>
+    <div class="two">
+      <section class="card" aria-label="활동 구역">
+        <div class="card-head"><h2>활동 구역</h2><span>머문 시간 비율 · 진할수록 오래 머묾</span></div>
+        <svg id="zones" viewBox="0 0 1050 680" role="img" aria-label="활동 구역 지도"></svg>
+      </section>
+      <section class="card" aria-label="빠르게 달린 장면">
+        <div class="card-head"><h2>빠르게 달린 장면</h2><span>누르면 복기 화면의 그 시각으로 이동</span></div>
+        <div id="runs" class="runs"></div>
+        <h2 class="sub-h">속도 변화</h2>
+        <svg id="speedChart" viewBox="0 0 600 150" role="img" aria-label="시간에 따른 속도"></svg>
+      </section>
+    </div>
+    <footer id="repFoot" class="foot"></footer>
+  </main>
+</div>
+</body>
+</html>

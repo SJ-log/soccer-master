@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>터치라인 — 영상 올리기</title>
+<link rel="stylesheet" href="style.css">
+<script defer src="home.js"></script>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="brand"><strong>터치라인</strong><span>같은 선수, 하나의 기록</span></div>
+  </header>
+
+  <section class="card" aria-label="영상 올리기">
+    <div class="card-head"><h2>경기 영상 올리기</h2><span>고정된 카메라로 찍은 영상 · mp4, mov</span></div>
+    <form id="uploadForm" class="form">
+      <label class="field">영상 파일<input type="file" id="file" name="file" accept=".mp4,.mov,.m4v,video/mp4,video/quicktime" required></label>
+      <label class="field">영상 종류
+        <select id="kind" name="kind"><option value="panorama">파노라마 (경기장 전체)</option><option value="phone">스마트폰</option></select>
+      </label>
+      <label class="field">경기장 길이 (m)<input type="number" id="pitchLength" name="pitch_length" value="105" min="20" max="130" step="0.5"></label>
+      <label class="field">경기장 폭 (m)<input type="number" id="pitchWidth" name="pitch_width" value="68" min="15" max="100" step="0.5"></label>
+      <button type="submit" id="uploadBtn" class="btn green">올리고 처리 시작</button>
+    </form>
+    <p id="uploadMsg" class="note" role="status"></p>
+  </section>
+
+  <section class="card" aria-label="올린 영상">
+    <div class="card-head"><h2>올린 영상</h2><span>처리가 끝나면 복기 화면이 열립니다</span></div>
+    <div id="videoList" class="list"><p class="empty">아직 올린 영상이 없어요.</p></div>
+  </section>
+</div>
+</body>
+</html>

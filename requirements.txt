@@ -1,0 +1,11 @@
+# 서버
+starlette>=0.40
+uvicorn>=0.30
+python-multipart>=0.0.9
+# 처리 과정
+numpy
+scipy
+opencv-python-headless
+# 검출·추적(GPU 서버에서만 필요). 11/19 실험과 같은 버전.
+ultralytics==8.4.156
+lap

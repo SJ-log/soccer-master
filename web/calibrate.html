@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>터치라인 — 경기장 맞추기</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <header class="topbar"><div class="brand"><strong>터치라인</strong><span>경기장 맞추기</span></div></header>
+  <div class="steps"><a href="index.html">영상 목록</a></div>
+  <section class="card">
+    <div class="card-head"><h2>경기장 맞추기 · 준비 중</h2><span>화면은 다음 단계에서 만듭니다</span></div>
+    <ul class="todo">
+      <li>영상 한 장면에서 경기장 선의 교차점을 4개 이상 찍는다</li>
+      <li>찍은 점마다 경기장의 어느 지점인지 고른다</li>
+      <li>점이 4개보다 적으면 미니맵 없이 복기만 쓴다</li>
+      <li>서버 저장: POST /api/videos/&lt;id&gt;/calibration (이미 동작)</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>
