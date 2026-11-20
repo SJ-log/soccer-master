@@ -52,10 +52,36 @@ def test_long_gap_is_not_filled():
 def test_homography_recovers_pitch_points():
     H = np.array([[0.05, 0.01, -50], [0.002, 0.11, -40], [1e-5, 4e-4, 1]])
     img = np.array([[100, 300], [1800, 320], [1700, 900], [200, 880], [950, 500]], float)
-    pts = [dict(img=i.tolist(), pitch=p.tolist()) for i, p in zip(img, P.to_pitch(img, H))]
+    pts = [dict(img=i.tolist(), pitch=p.tolist()) for i, p in zip(img, P.to_pitch(img, dict(H=H)))]
     c = P.fit(pts)
     assert c['residual_m']['max'] < 0.01
-    assert P.to_pitch([[1000, 600]], c['H']) == pytest.approx(P.to_pitch([[1000, 600]], H), abs=0.01)
+    assert P.to_pitch([[1000, 600]], c) == pytest.approx(P.to_pitch([[1000, 600]], dict(H=H)), abs=0.01)
+
+
+def test_lens_fit_beats_plane_on_a_bent_image():
+    """휘어진 화면(파노라마)을 흉내 낸다: 경기장 점을 평면 변환 후 어안 렌즈로 화면에 옮긴다."""
+    import cv2
+    lens = [1600.0, 2400.0, 2000.0, 520.0, -0.07, 0.02]; K = np.array([[lens[0], 0, lens[2]], [0, lens[1], lens[3]], [0, 0, 1.0]]); D = np.array(lens[4:] + [0, 0]).reshape(4, 1)
+    def to_img(pitch):       # 경기장 -> 화면
+        n = np.column_stack([pitch[:, 0] / 60.0, (pitch[:, 1] + 70) / 110.0 - 0.6]); return cv2.fisheye.distortPoints(n.reshape(-1, 1, 2), K, D).reshape(-1, 2)
+    xs = [-52.5, -36, 0, 36, 52.5]; ys = [-34, -20.16, 0, 20.16, 34]
+    known = np.array([(x, y) for x in xs for y in ys if (x, y) not in ((-36, 0), (36, 0))], float)            # 선이 만나는 곳 23개
+    on_line = np.array([(x, y) for y in (-34, 34) for x in np.linspace(-45, 45, 7)], float)                    # 터치라인 위 14개
+    pts = [dict(img=i.tolist(), pitch=p.tolist()) for i, p in zip(to_img(known), known)]
+    pts += [dict(img=i.tolist(), line=dict(axis='y', value=float(p[1]))) for i, p in zip(to_img(on_line), on_line)]
+    check = np.array([(x, y) for x in np.linspace(-50, 50, 9) for y in np.linspace(-30, 30, 7)], float)
+    err = lambda c: float(np.hypot(*(P.to_pitch(to_img(check), c) - check).T).max())
+    lens_fit = P.fit(pts, 'lens', (4096, 1080)); plane_fit = P.fit(pts, 'plane')
+    assert lens_fit['line_points'] == 14 and lens_fit['points'] == 23
+    assert err(lens_fit) < 0.3 < err(plane_fit)
+
+
+def test_lens_needs_nine_points_and_bad_line_is_rejected():
+    pts = [dict(img=[i * 100, i * 37 % 500], pitch=[i, i]) for i in range(8)]
+    with pytest.raises(ValueError):
+        P.fit(pts, 'lens')
+    with pytest.raises(ValueError):
+        P.fit(pts + [dict(img=[1, 2], line=dict(axis='z', value=0))], 'plane')
 
 
 def test_calibration_needs_four_points():

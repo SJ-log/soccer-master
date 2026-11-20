@@ -18,7 +18,7 @@ def _player(pid, name, kind, rows, fps, frames, calib, pitch):
     out = dict(id=int(pid), name=name, kind=kind, jersey=-1, team=-1, role=0, f0=f0, n=span, box=box.ravel().tolist(),
                observed_sec=round(len(fr) / fps, 1), segments=[[f0 + s, f0 + e] for s, e in M.runs(seen, 1)], fast_runs=[], jumps=[], titles=[])
     if calib:
-        foot = np.column_stack([rows[:, 1] + rows[:, 3] / 2, rows[:, 2] + rows[:, 4]]); pos = P.to_pitch(foot, calib['H'])
+        foot = np.column_stack([rows[:, 1] + rows[:, 3] / 2, rows[:, 2] + rows[:, 4]]); pos = P.to_pitch(foot, calib)
         m, Xs, Ys, valid, _ = M.compute(fr, pos[:, 0], pos[:, 1], fps, pitch)
         q = np.column_stack([np.round(Xs * 100), np.round(Ys * 100)]); q[~valid] = NONE
         q = np.clip(q, -NONE, NONE).astype(int)       # 화면 밖으로 멀리 튄 값이 형식을 깨지 않게 한다
@@ -73,6 +73,6 @@ def build(video_id: str, meta: dict, tracks: np.ndarray, calib: dict | None = No
         clip=dict(id=video_id, label=meta['name'], fps=fps, frames=info['frames'], width=info['width'], height=info['height'],
                   video=f'/media/{video_id}/video.mp4', t0=info.get('t0', 0)),
         pitch=dict(length=pitch[0], width=pitch[1]), params={k: M.PARAMS[k] for k in ('hsr', 'sprint', 'smooth_sec', 'min_sec', 'max_gap', 'grid')},
-        calibration=dict(points=calib['points'], residual_m=calib['residual_m']) if calib else None,
+        calibration=dict(model=calib.get('model', 'plane'), points=calib['points'], line_points=calib.get('line_points', 0), residual_m=calib['residual_m']) if calib else None,
         players=players + raw,
     )

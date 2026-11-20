@@ -91,16 +91,21 @@ async def media(request):
 
 
 async def set_calibration(request):
-    """경기장 점을 받아 변환을 맞추고 결과를 다시 만든다. body: {"points": [{"img": [x, y], "pitch": [X, Y]}, ...]}"""
+    """경기장 점을 받아 변환을 맞추고 결과를 다시 만든다.
+    body: {"points": [{"img": [x, y], "pitch": [X, Y]} 또는 {"img": [x, y], "line": {"axis": "y", "value": -34}}, ...], "model": "plane" | "lens" (생략하면 영상 종류로 정함)}"""
     video_id = request.path_params['id']
     try:
-        body = await request.json(); calib = positions.fit(body.get('points') or [])
+        body = await request.json(); meta = store.read(video_id, 'meta.json')
+        if meta is None:
+            raise KeyError(video_id)
+        model = body.get('model') or ('lens' if meta['kind'] == 'panorama' else 'plane')       # 파노라마는 렌즈 휨까지 맞춘다
+        calib = positions.fit(body.get('points') or [], model, (meta['video']['width'], meta['video']['height']))
         calib['points_raw'] = body['points']; store.write(video_id, 'calibration.json', calib); data = run.rebuild(video_id)
     except KeyError:
         return err('영상을 찾을 수 없습니다', 404)
     except (ValueError, TypeError) as e:
         return err(str(e))
-    return JSONResponse(dict(residual_m=calib['residual_m'], points=calib['points'], has_positions=data['has_positions']))
+    return JSONResponse(dict(model=calib['model'], residual_m=calib['residual_m'], points=calib['points'], line_points=calib['line_points'], has_positions=data['has_positions']))
 
 
 async def get_players(request):

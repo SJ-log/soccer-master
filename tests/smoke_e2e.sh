@@ -13,9 +13,10 @@ for i in $(seq 120); do S=$(curl -sf "$BASE/api/videos/$ID" | python3 -c "import
 echo "[처리] $S"
 curl -sf "$BASE/api/videos/$ID/data" | python3 -c "import json,sys;d=json.load(sys.stdin);print('[결과] 기록',len(d['players']),'개, 위치',d['has_positions'],', 프레임',d['clip']['frames'],', t0',d['clip']['t0'])"
 echo "[구간 요청] $(curl -s -o /dev/null -w '%{http_code} %{size_download}' -H 'Range: bytes=0-999' "$BASE/media/$ID/video.mp4")"
-echo "[경기장 맞추기] $(curl -sf -H 'Content-Type: application/json' -d '{"points":[{"img":[300,250],"pitch":[-52.5,-34]},{"img":[3800,250],"pitch":[52.5,-34]},{"img":[4000,1000],"pitch":[52.5,34]},{"img":[100,1000],"pitch":[-52.5,34]}]}' "$BASE/api/videos/$ID/calibration")"
+echo "[경기장 맞추기] $(curl -sf -H 'Content-Type: application/json' -d '{"model":"plane","points":[{"img":[300,250],"pitch":[-52.5,-34]},{"img":[3800,250],"pitch":[52.5,-34]},{"img":[4000,1000],"pitch":[52.5,34]},{"img":[100,1000],"pitch":[-52.5,34]}]}' "$BASE/api/videos/$ID/calibration")"
 FIRST=$(curl -sf "$BASE/api/videos/$ID/data" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['players'][0]['id'])")
 echo "[기록 잇기] $(curl -sf -H 'Content-Type: application/json' -d "{\"players\":[{\"name\":\"나\",\"parts\":[{\"track\":$FIRST}]}]}" "$BASE/api/videos/$ID/players")"
 curl -sf "$BASE/api/videos/$ID/data" | python3 -c "import json,sys;d=json.load(sys.stdin);p=d['players'][0];print('[다시 계산]',p['name'],p['kind'],'거리',p['distance_m'],'m, 최고',p['top_speed'],'m/s')"
+echo "[파노라마는 점 9개 이상] $(curl -s -H 'Content-Type: application/json' -d '{"points":[{"img":[300,250],"pitch":[-52.5,-34]},{"img":[3800,250],"pitch":[52.5,-34]},{"img":[4000,1000],"pitch":[52.5,34]},{"img":[100,1000],"pitch":[-52.5,34]}]}' "$BASE/api/videos/$ID/calibration")"
 echo "[잘못된 요청] $(curl -s -o /dev/null -w '%{http_code}' -F 'file=@'"$0" "$BASE/api/videos") $(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/videos/nope/data") $(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"points":[]}' "$BASE/api/videos/$ID/calibration")"
 echo "data=$TL_DATA id=$ID"
