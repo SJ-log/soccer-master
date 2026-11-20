@@ -108,3 +108,21 @@ body:not(.no-pos) .only-no-pos{display:none}
 .progress{height:8px;width:220px;background:#E6E9E5;border-radius:4px;overflow:hidden}
 .progress i{display:block;height:100%;background:var(--green)}
 .todo{margin:0;padding-left:20px;font-size:15px;line-height:1.7}
+
+/* ---- 기록 잇기 ---- */
+.stitch-grid{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(280px,1fr);gap:16px;align-items:start}
+.stitch-side{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.todo-text{margin:0;font-size:16px;line-height:1.5}
+.confirm{margin-top:12px;padding:12px;border-radius:8px;background:#FFF3E8;border:1px solid #E8B98A}
+.confirm p{margin:0;font-size:15px;font-weight:700;color:#5A2A05}
+.part-list{margin:0 0 12px;padding-left:22px;font-size:14px;line-height:1.7;color:var(--ink)}
+.part-list:empty::before{content:"아직 고른 기록이 없어요";color:var(--muted);margin-left:-22px}
+#zoom{cursor:pointer;display:block;width:100%;height:auto}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+@media (max-width:900px){.stitch-grid{grid-template-columns:1fr}}
+.stitch-side .btn:not(.green):not(.dark),.stitch-grid .controls .btn:not(.green):not(.dark){background:#fff;border:1px solid #C9CEC9;color:var(--ink)}
+.cand-btn{font-weight:400}
+.link-btn{padding:0;border:0;background:none;color:var(--green);font:inherit;font-weight:700;cursor:pointer;text-decoration:underline}
+.stitch-grid .timeline{flex:1 1 200px;min-width:120px}
+#cands:empty{display:none}

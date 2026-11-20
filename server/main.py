@@ -103,6 +103,14 @@ async def set_calibration(request):
     return JSONResponse(dict(residual_m=calib['residual_m'], points=calib['points'], has_positions=data['has_positions']))
 
 
+async def get_players(request):
+    """저장된 기록 묶음(없으면 빈 목록)"""
+    try:
+        return JSONResponse(store.read(request.path_params['id'], 'players.json') or dict(players=[]))
+    except KeyError:
+        return err('영상을 찾을 수 없습니다', 404)
+
+
 async def set_players(request):
     """사용자가 이은 기록 묶음을 저장하고 지표를 다시 계산한다.
     body: {"players": [{"name": "나", "parts": [{"track": 12, "from": 0, "to": 900}, ...]}]}"""
@@ -128,6 +136,7 @@ app = Starlette(routes=[
     Route('/api/videos/{id}', get_video, methods=['GET']),
     Route('/api/videos/{id}/data', get_data, methods=['GET']),
     Route('/api/videos/{id}/calibration', set_calibration, methods=['POST']),
+    Route('/api/videos/{id}/players', get_players, methods=['GET']),
     Route('/api/videos/{id}/players', set_players, methods=['POST']),
     Route('/media/{id}/video.mp4', media, methods=['GET']),
     Mount('/', StaticFiles(directory=WEB, html=True)),

@@ -67,6 +67,77 @@
     if (sel.hsr_count === 0) return { text: '고속 달리기(초속 ' + '5.5m 이상)가 한 번도 없었어요. 속도를 낼 장면이 있었는지 살펴보세요.', frame: null };
     return { text: '이동 거리와 고속 달리기 모두 ' + groupName + ' 평균과 비슷했어요.', frame: run ? run.start : null };
   }
-  const api = { NONE, clamp, frameAt, fmtTime, boxAt, posAt, speedAt, pickBox, pickDot, peers, compare, halves, advice, mean };
+  // ---- 기록 잇기 ----
+  // 한 선수의 기록 = 조각의 목록 [{track, from, to}] (프레임, 양끝 포함, 시간 순, 서로 겹치지 않음)
+  const last = (t) => t.f0 + t.n - 1;
+  const foot = (b) => [b[0] + b[2] / 2, b[1] + b[3]];
+  const stitch = {
+    GAP: 125,      // 끊긴 뒤 이 프레임 수 안에 나타나는 기록만 후보로 본다 (25fps에서 5초)
+    REACH: [2.0, 0.4],   // 후보 거리 한계 = 박스 높이 × (2.0 + 0.4 × 지난 프레임 수)
+    chainBox(parts, byId, f) {       // 그 프레임에서 내 박스와 그 박스가 속한 기록
+      for (const p of parts) if (f >= p.from && f <= p.to) { const b = boxAt(byId[p.track], f); return b ? { box: b, track: p.track } : null; }
+      return null;
+    },
+    range(parts) { return parts.length ? [parts[0].from, parts[parts.length - 1].to] : null; },
+    // f부터는 이 기록이 나다: f 이후의 조각은 버리고 이 기록을 끝까지 붙인다
+    continueFrom(parts, byId, f, track) {
+      const t = byId[track], out = [];
+      for (const p of parts) { if (p.from >= f) continue; out.push({ track: p.track, from: p.from, to: Math.min(p.to, f - 1) }); }
+      const from = Math.max(f, t.f0); if (from <= last(t)) out.push({ track, from, to: last(t) });
+      return out;
+    },
+    // 내 기록이 시작되기 전 구간을 이 기록으로 채운다
+    prepend(parts, byId, track) {
+      const t = byId[track], to = Math.min(parts[0].from - 1, last(t));
+      return to >= t.f0 ? [{ track, from: t.f0, to }].concat(parts) : parts;
+    },
+    // f부터는 내가 아니다
+    cut(parts, f) {
+      const out = [];
+      for (const p of parts) { if (p.from >= f) continue; out.push({ track: p.track, from: p.from, to: Math.min(p.to, f - 1) }); }
+      return out;
+    },
+    // 내 기록이 끝난 뒤(dir=1) 또는 시작되기 전(dir=-1)에 이어질 만한 기록을 가까운 순서로
+    candidates(tracks, byId, parts, dir, fps, limit) {
+      if (!parts.length) return [];
+      const edge = dir > 0 ? parts[parts.length - 1] : parts[0], e = dir > 0 ? edge.to : edge.from; let ref = null;
+      for (let k = 0; k < 25 && !ref; k++) ref = boxAt(byId[edge.track], e - dir * k);
+      if (!ref) return [];
+      // 끊기기 직전 0.4초의 움직임이 1초까지 이어진다고 보고 예상 위치를 잡는다
+      const rf = foot(ref), prev = boxAt(byId[edge.track], e - dir * 10), vel = prev ? [(rf[0] - foot(prev)[0]) / 10, (rf[1] - foot(prev)[1]) / 10] : [0, 0], out = [];
+      for (const t of tracks) {
+        if (t.id === edge.track) continue;
+        for (let dt = 1; dt <= stitch.GAP; dt++) {
+          const g = e + dir * dt; if (g < t.f0 || g > last(t)) { if ((dir > 0 && g > last(t)) || (dir < 0 && g < t.f0)) break; continue; }
+          const b = boxAt(t, g); if (!b) continue;
+          const k = Math.min(dt, fps), d = Math.hypot(foot(b)[0] - rf[0] - vel[0] * k, foot(b)[1] - rf[1] - vel[1] * k) / ref[3];
+          // 내 기록이 끊기기 전부터 따로 있던 기록은 다른 선수일 가능성이 높아 뒤로 보낸다
+          const existed = dir > 0 ? t.f0 <= e : last(t) >= e;
+          if (d <= stitch.REACH[0] + stitch.REACH[1] * dt) out.push({ track: t.id, frame: g, dt, existed, score: d + dt / fps + (existed ? 1.5 : 0) });
+          break;      // 그 기록이 처음(또는 마지막으로) 보이는 프레임만 본다
+        }
+      }
+      return out.sort((a, b) => a.score - b.score).slice(0, limit || 5);
+    },
+    // 내 박스가 다른 기록의 박스와 겹친 구간: 겹친 뒤 다른 선수로 넘어갔는지 확인할 곳
+    crossings(tracks, byId, parts, minIou, mergeGap) {
+      const hits = [];
+      for (const p of parts) {
+        const me = byId[p.track];
+        for (let f = p.from; f <= p.to; f++) {
+          const a = boxAt(me, f); if (!a) continue;
+          for (const t of tracks) {
+            if (t.id === p.track) continue; const b = boxAt(t, f); if (!b) continue;
+            const w = Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0]), h = Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]);
+            if (w > 0 && h > 0 && w * h / (a[2] * a[3] + b[2] * b[3] - w * h) >= (minIou || 0.2)) { hits.push(f); break; }
+          }
+        }
+      }
+      const out = [];
+      for (const f of hits) { const c = out[out.length - 1]; if (c && f - c.end <= (mergeGap || 25)) c.end = f; else out.push({ start: f, end: f }); }
+      return out;
+    },
+  };
+  const api = { NONE, clamp, frameAt, fmtTime, boxAt, posAt, speedAt, pickBox, pickDot, peers, compare, halves, advice, mean, stitch };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TLCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -9,6 +9,7 @@
 | GET | `/api/videos/{id}` | 영상 하나의 정보와 처리 상태 |
 | GET | `/api/videos/{id}/data` | 화면용 결과 |
 | POST | `/api/videos/{id}/calibration` | 경기장 점 저장 → 위치와 지표 다시 계산 |
+| GET | `/api/videos/{id}/players` | 저장된 기록 묶음 |
 | POST | `/api/videos/{id}/players` | 이은 기록 묶음 저장 → 지표 다시 계산 |
 | GET | `/media/{id}/video.mp4` | 재생용 영상 (구간 요청 지원) |
 
