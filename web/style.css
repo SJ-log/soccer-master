@@ -126,3 +126,23 @@ body:not(.no-pos) .only-no-pos{display:none}
 .link-btn{padding:0;border:0;background:none;color:var(--green);font:inherit;font-weight:700;cursor:pointer;text-decoration:underline}
 .stitch-grid .timeline{flex:1 1 200px;min-width:120px}
 #cands:empty{display:none}
+
+/* ---- 경기장 맞추기 ---- */
+#view{display:block;width:100%;height:auto;cursor:crosshair;background:#1b2a22;touch-action:none}
+.cal-pitch{display:block;width:100%;height:auto;background:#2F6B4A;border-radius:8px}
+.cal-pitch .ln{fill:none;stroke:#fff;stroke-width:.5;opacity:.9}
+.cal-pitch .hit-line{stroke:transparent;stroke-width:5;cursor:pointer;fill:none}
+.cal-pitch .hit-line:hover,.cal-pitch .hit-line.active{stroke:rgba(242,140,56,.55)}
+.cal-pitch .hit-line.has{stroke:rgba(255,255,255,.28)}
+.cal-pitch .hit-line.has.active{stroke:rgba(242,140,56,.7)}
+.cal-pitch .lm{fill:#fff;stroke:#12281C;stroke-width:.5;cursor:pointer}
+.cal-pitch .lm.done{fill:#7BE0A0}
+.cal-pitch .lm.active{fill:#F28C38;stroke:#fff}
+.cal-pitch .lm-hit{fill:transparent;cursor:pointer}
+.cal-dot{display:inline-block;flex:none;width:12px;height:12px;border-radius:50%;margin-right:6px;border:1.5px solid #12281C;vertical-align:-1px}
+.cal-dot.todo{background:#fff}.cal-dot.done{background:#7BE0A0}.cal-dot.active{background:#F28C38}
+.cal-time{display:flex;align-items:center;gap:8px;flex:1 1 180px;font-size:14px;color:var(--muted)}
+.cal-time input{flex:1}
+.cal-check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);min-height:32px}
+.part-list li.bad{color:#8A1F1F;font-weight:700}
+.part-list li.sel{background:#FFF3E8}

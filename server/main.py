@@ -9,7 +9,8 @@ from starlette.responses import JSONResponse, FileResponse
 from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 from . import store
-from .pipeline import run, positions
+import numpy as np
+from .pipeline import run, positions, pitch
 
 WEB = Path(__file__).resolve().parent.parent / 'web'
 KINDS = ('panorama', 'phone')
@@ -90,9 +91,44 @@ async def media(request):
     return FileResponse(p, media_type='video/mp4')       # 구간 요청(Range)을 지원해 탐색이 된다
 
 
+def _overlay(calib, meta):
+    """맞춘 결과로 경기장 선을 화면 좌표로 옮긴다. 화면 밖으로 멀리 나간 점에서 선을 끊는다."""
+    W, H = meta['video']['width'], meta['video']['height']; out = []
+    for line in pitch.shapes(meta['pitch']['length'], meta['pitch']['width']):
+        q = positions.to_image(line, calib); cur = []
+        for x, y in q.tolist():
+            if x == x and -W < x < 2 * W and -H < y < 2 * H:
+                cur.append([round(x, 1), round(y, 1)])
+            else:
+                if len(cur) > 1:
+                    out.append(cur)
+                cur = []
+        if len(cur) > 1:
+            out.append(cur)
+    return out
+
+
+async def get_calibration(request):
+    """경기장 맞추기 화면이 필요한 것: 영상 정보, 찍을 수 있는 점과 선, 경기장 그림, 저장된 결과"""
+    video_id = request.path_params['id']
+    try:
+        meta = store.read(video_id, 'meta.json')
+    except KeyError:
+        meta = None
+    if meta is None or 'video' not in meta:
+        return err('영상을 찾을 수 없습니다', 404)
+    L, Wd = meta['pitch']['length'], meta['pitch']['width']; calib = store.read(video_id, 'calibration.json')
+    return JSONResponse(dict(
+        name=meta['name'], kind=meta['kind'], default_model='lens' if meta['kind'] == 'panorama' else 'plane', min_points=positions.MIN_POINTS,
+        video=dict(meta['video'], url=f'/media/{video_id}/video.mp4'), pitch=meta['pitch'],
+        landmarks=pitch.landmarks(L, Wd), lines=pitch.lines(L, Wd), shapes=pitch.shapes(L, Wd, 2.0),
+        saved=dict(model=calib['model'], points=calib.get('points_raw', []), residual_m=calib['residual_m'], overlay=_overlay(calib, meta)) if calib and 'model' in calib else None))
+
+
 async def set_calibration(request):
-    """경기장 점을 받아 변환을 맞추고 결과를 다시 만든다.
-    body: {"points": [{"img": [x, y], "pitch": [X, Y]} 또는 {"img": [x, y], "line": {"axis": "y", "value": -34}}, ...], "model": "plane" | "lens" (생략하면 영상 종류로 정함)}"""
+    """경기장 점을 받아 변환을 맞춘다. save가 false면 저장하지 않고 결과만 돌려준다(찍는 동안 미리 보기).
+    body: {"points": [{"img": [x, y], "pitch": [X, Y]} 또는 {"img": [x, y], "line": {"axis": "y", "value": -34}}, ...],
+           "model": "plane" | "lens" (생략하면 영상 종류로 정함), "save": true}"""
     video_id = request.path_params['id']
     try:
         body = await request.json(); meta = store.read(video_id, 'meta.json')
@@ -100,12 +136,16 @@ async def set_calibration(request):
             raise KeyError(video_id)
         model = body.get('model') or ('lens' if meta['kind'] == 'panorama' else 'plane')       # 파노라마는 렌즈 휨까지 맞춘다
         calib = positions.fit(body.get('points') or [], model, (meta['video']['width'], meta['video']['height']))
-        calib['points_raw'] = body['points']; store.write(video_id, 'calibration.json', calib); data = run.rebuild(video_id)
+        out = dict(model=calib['model'], residual_m=calib['residual_m'], point_errors_m=calib['point_errors_m'], points=calib['points'], line_points=calib['line_points'],
+                   overlay=_overlay(calib, meta), saved=False)
+        if body.get('save', True):
+            calib['points_raw'] = body['points']; store.write(video_id, 'calibration.json', calib); data = run.rebuild(video_id)
+            out.update(saved=True, has_positions=data['has_positions'])
     except KeyError:
         return err('영상을 찾을 수 없습니다', 404)
-    except (ValueError, TypeError) as e:
-        return err(str(e))
-    return JSONResponse(dict(model=calib['model'], residual_m=calib['residual_m'], points=calib['points'], line_points=calib['line_points'], has_positions=data['has_positions']))
+    except (ValueError, TypeError, np.linalg.LinAlgError) as e:
+        return err(str(e) or '점의 배치로는 변환을 구할 수 없습니다')
+    return JSONResponse(out)
 
 
 async def get_players(request):
@@ -140,6 +180,7 @@ app = Starlette(routes=[
     Route('/api/videos', upload, methods=['POST']),
     Route('/api/videos/{id}', get_video, methods=['GET']),
     Route('/api/videos/{id}/data', get_data, methods=['GET']),
+    Route('/api/videos/{id}/calibration', get_calibration, methods=['GET']),
     Route('/api/videos/{id}/calibration', set_calibration, methods=['POST']),
     Route('/api/videos/{id}/players', get_players, methods=['GET']),
     Route('/api/videos/{id}/players', set_players, methods=['POST']),

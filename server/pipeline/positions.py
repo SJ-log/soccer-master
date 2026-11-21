@@ -48,7 +48,7 @@ def _split(points):
 
 
 def fit(points: list[dict], model: str = 'plane', size: tuple[int, int] = (1920, 1080)) -> dict:
-    """반환: {model, H, lens, residual_m: {mean, max}, points, line_points}. residual_m은 찍은 점에서의 오차다."""
+    """반환: {model, H, lens, w_sign, residual_m: {mean, max}, point_errors_m, points, line_points}. residual_m은 찍은 점에서의 오차다."""
     if model not in MIN_POINTS:
         raise ValueError('model은 plane 또는 lens입니다')
     img, pitch, limg, axis, value = _split(points)
@@ -71,10 +71,25 @@ def fit(points: list[dict], model: str = 'plane', size: tuple[int, int] = (1920,
                 best = r
         lens = [float(v) for v in best.x]
     H = _homography(_undistort(img, lens), pitch)
-    res = np.hypot(*(_project(img, H, lens) - pitch).T)
-    if len(limg):
-        res = np.concatenate([res, np.abs(_project(limg, H, lens)[np.arange(len(limg)), axis] - value)])
-    return dict(model=model, H=H.tolist(), lens=lens, residual_m=dict(mean=round(float(res.mean()), 2), max=round(float(res.max()), 2)), points=len(img), line_points=len(limg))
+    res = np.hypot(*(_project(img, H, lens) - pitch).T); lres = np.abs(_project(limg, H, lens)[np.arange(len(limg)), axis] - value) if len(limg) else np.zeros(0)
+    # 점마다의 오차를 넣은 순서대로 돌려준다(어느 점을 잘못 찍었는지 보이게)
+    it, il = iter(res.tolist()), iter(lres.tolist()); errors = [round(next(it) if 'pitch' in p else next(il), 2) for p in points if 'pitch' in p or 'line' in p]
+    allres = np.concatenate([res, lres]); c = np.append(pitch.mean(0), 1.0) @ np.linalg.inv(H).T
+    return dict(model=model, H=H.tolist(), lens=lens, w_sign=1.0 if c[2] >= 0 else -1.0, residual_m=dict(mean=round(float(allres.mean()), 2), max=round(float(allres.max()), 2)),
+                point_errors_m=errors, points=len(img), line_points=len(limg))
+
+
+def to_image(pitch, calib) -> np.ndarray:
+    """경기장 m -> 화면 px (to_pitch의 반대). 맞춘 결과로 경기장 선을 영상 위에 다시 그릴 때 쓴다.
+    카메라 뒤쪽으로 넘어가 화면에 나올 수 없는 점은 NaN."""
+    p = np.asarray(pitch, np.float64).reshape(-1, 2); Hinv = np.linalg.inv(np.asarray(calib['H'], np.float64))
+    v = np.column_stack([p, np.ones(len(p))]) @ Hinv.T; ok = v[:, 2] * calib.get('w_sign', 1.0) > 1e-9
+    u = np.full((len(p), 2), np.nan); u[ok] = v[ok, :2] / v[ok, 2:3]
+    lens = calib.get('lens')
+    if lens is not None and ok.any():
+        K = np.array([[lens[0], 0, lens[2]], [0, lens[1], lens[3]], [0, 0, 1.0]]); n = np.column_stack([(u[ok, 0] - lens[2]) / lens[0], (u[ok, 1] - lens[3]) / lens[1]])
+        u[ok] = cv2.fisheye.distortPoints(n.reshape(-1, 1, 2), K, np.array([lens[4], lens[5], 0, 0]).reshape(4, 1)).reshape(-1, 2)
+    return u
 
 
 def to_pitch(foot, calib) -> np.ndarray:

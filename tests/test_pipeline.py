@@ -76,6 +76,31 @@ def test_lens_fit_beats_plane_on_a_bent_image():
     assert err(lens_fit) < 0.3 < err(plane_fit)
 
 
+def test_to_image_is_the_inverse_of_to_pitch():
+    import cv2
+    lens = [1600.0, 2400.0, 2000.0, 520.0, -0.07, 0.02]; K = np.array([[lens[0], 0, lens[2]], [0, lens[1], lens[3]], [0, 0, 1.0]]); D = np.array(lens[4:] + [0, 0]).reshape(4, 1)
+    to_img = lambda pitch: cv2.fisheye.distortPoints(np.column_stack([pitch[:, 0] / 60.0, (pitch[:, 1] + 70) / 110.0 - 0.6]).reshape(-1, 1, 2), K, D).reshape(-1, 2)
+    known = np.array([(x, y) for x in (-52.5, -36, 0, 36, 52.5) for y in (-34, -20.16, 0, 20.16, 34)], float)
+    pts = [dict(img=i.tolist(), pitch=p.tolist()) for i, p in zip(to_img(known), known)]
+    check = np.array([(x, y) for x in np.linspace(-50, 50, 5) for y in np.linspace(-30, 30, 4)], float)
+    for model in ('lens', 'plane'):
+        c = P.fit(pts, model, (4096, 1080))
+        assert P.to_pitch(P.to_image(check, c), c) == pytest.approx(check, abs=0.05)
+        assert len(c['point_errors_m']) == len(pts)
+
+
+def test_pitch_landmarks_and_shapes():
+    from server.pipeline import pitch
+    lm = pitch.landmarks(105, 68); ids = [p['id'] for p in lm]
+    assert len(ids) == len(set(ids)) == 35
+    by = {p['id']: p['pitch'] for p in lm}
+    assert by['cornerLF'] == [-52.5, -34] and by['penInRN'] == [36.0, 20.16] and by['center'] == [0, 0] and by['spotL'] == [-41.5, 0]
+    assert all(abs(x) <= 52.5 and abs(y) <= 34 for x, y in by.values())
+    sh = pitch.shapes(105, 68)
+    assert len(sh) == 12 and all(abs(x) <= 52.51 and abs(y) <= 34.01 for line in sh for x, y in line)
+    assert {l['id'] for l in pitch.lines(105, 68)} == {'touchF', 'touchN', 'goalL', 'goalR', 'halfway'}
+
+
 def test_lens_needs_nine_points_and_bad_line_is_rejected():
     pts = [dict(img=[i * 100, i * 37 % 500], pitch=[i, i]) for i in range(8)]
     with pytest.raises(ValueError):

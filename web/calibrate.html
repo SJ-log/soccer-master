@@ -6,20 +6,49 @@
 <title>터치라인 — 경기장 맞추기</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
+<script defer src="calibrate.js"></script>
 </head>
 <body>
 <div class="page">
-  <header class="topbar"><div class="brand"><strong>터치라인</strong><span>경기장 맞추기</span></div></header>
-  <div class="steps"><a href="index.html">영상 목록</a></div>
-  <section class="card">
-    <div class="card-head"><h2>경기장 맞추기 · 준비 중</h2><span>화면은 다음 단계에서 만듭니다</span></div>
-    <ul class="todo">
-      <li>영상 한 장면에서 경기장 선의 교차점을 4개 이상 찍는다</li>
-      <li>찍은 점마다 경기장의 어느 지점인지 고른다</li>
-      <li>점이 4개보다 적으면 미니맵 없이 복기만 쓴다</li>
-      <li>서버 저장: POST /api/videos/&lt;id&gt;/calibration (이미 동작)</li>
-    </ul>
-  </section>
+  <header class="topbar">
+    <div class="brand"><strong>터치라인</strong><span>경기장 맞추기</span></div>
+    <nav class="tabs"><a id="linkWatch" class="tab" href="watch.html">복기 화면</a></nav>
+  </header>
+  <div class="steps"><a href="index.html">영상 목록</a><span>·</span><span>영상 속 경기장 선의 위치를 알려 주면 거리와 속도를 잴 수 있습니다</span></div>
+  <p id="loadError" class="load-error" role="alert" hidden></p>
+
+  <div class="stitch-grid">
+    <section class="card" aria-label="영상">
+      <div class="card-head"><h2>영상에서 찍기</h2><span>휠: 확대·축소 · 끌기: 이동 · 누르기: 점 찍기</span></div>
+      <div class="follow-wrap"><canvas id="view" width="1280" height="620" aria-label="영상. 눌러서 점을 찍습니다"></canvas></div>
+      <div class="controls">
+        <button type="button" id="zoomIn" class="btn" aria-label="확대">＋</button>
+        <button type="button" id="zoomOut" class="btn" aria-label="축소">－</button>
+        <button type="button" id="zoomFit" class="btn">전체 보기</button>
+        <label class="cal-time">장면 <input type="range" id="time" min="0" max="1000" value="0" aria-label="장면 고르기"></label>
+        <label class="cal-check"><input type="checkbox" id="showLines" checked> 맞춘 선 보기</label>
+      </div>
+      <p class="note">선이 잘 보이는 장면을 고르고, 크게 확대해서 선이 만나는 곳의 한가운데를 찍어 주세요. 찍은 점을 누른 뒤 화살표 키로 1픽셀씩 옮길 수 있어요.</p>
+    </section>
+
+    <aside class="stitch-side">
+      <section class="card" aria-label="경기장 그림">
+        <div class="card-head"><h2>① 경기장에서 고르기</h2><span>위쪽이 영상에서 먼 쪽</span></div>
+        <svg id="pitch" class="cal-pitch" role="img" aria-label="경기장 그림. 점이나 선을 눌러 고릅니다"></svg>
+        <p id="target" class="todo-text"></p>
+        <div class="legend"><span><i class="cal-dot todo"></i>안 찍은 점</span><span><i class="cal-dot done"></i>찍은 점</span><span><i class="cal-dot active"></i>지금 찍을 곳</span></div>
+      </section>
+      <section class="card" aria-label="맞춤 결과">
+        <div class="card-head"><h2>② 결과 확인</h2><span id="counts"></span></div>
+        <label class="cal-check"><input type="checkbox" id="lens"> 화면이 휘어 있음 (파노라마)</label>
+        <p id="status" class="todo-text"></p>
+        <ol id="pointList" class="part-list"></ol>
+        <div class="row"><button type="button" id="saveBtn" class="btn green" disabled>저장</button><button type="button" id="delBtn" class="btn" disabled>고른 점 지우기</button><button type="button" id="clearBtn" class="btn" disabled>모두 지우기</button></div>
+        <p id="saveMsg" class="note" role="status"></p>
+      </section>
+    </aside>
+  </div>
+  <video id="video" muted playsinline preload="auto" hidden></video>
 </div>
 </body>
 </html>

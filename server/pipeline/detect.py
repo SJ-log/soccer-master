@@ -15,7 +15,9 @@ BATCH = 4
 def detect(video: Path, kind: str, on_progress=lambda done, total: None) -> tuple[np.ndarray, dict]:
     """영상 전체 프레임을 원본 해상도로 검출한다. 반환: (frame, x1, y1, x2, y2, conf) 배열과 정보."""
     import cv2
+    import torch
     from ultralytics import YOLO          # 검출 환경이 없는 곳(개발용 PC)에서는 여기서 오류가 난다
+    gpu = torch.cuda.is_available()         # GPU가 없으면 CPU로 돈다(아주 느리다. 동작 확인용)
     weights = WEIGHTS.get(kind, WEIGHTS['phone'])
     model = YOLO(weights)
     cap = cv2.VideoCapture(str(video))
@@ -25,7 +27,7 @@ def detect(video: Path, kind: str, on_progress=lambda done, total: None) -> tupl
 
     def flush():
         nonlocal f
-        for r in model.predict(buf, imgsz=imgsz, conf=CONF, classes=[0], device=0, half=True, verbose=False):
+        for r in model.predict(buf, imgsz=imgsz, conf=CONF, classes=[0], device=0 if gpu else 'cpu', half=gpu, verbose=False):
             b = r.boxes
             rows.append(np.column_stack([np.full(len(b), f), b.xyxy.cpu().numpy(), b.conf.cpu().numpy()])); f += 1
         buf.clear(); on_progress(f, total)
@@ -40,4 +42,4 @@ def detect(video: Path, kind: str, on_progress=lambda done, total: None) -> tupl
     if buf:
         flush()
     det = np.concatenate(rows).astype(np.float32) if rows else np.zeros((0, 6), np.float32)
-    return det, dict(weights=weights, imgsz=imgsz, conf=CONF, frames=f, width=W, height=H)
+    return det, dict(weights=weights, imgsz=imgsz, conf=CONF, frames=f, width=W, height=H, device='gpu' if gpu else 'cpu')

@@ -8,6 +8,7 @@
 | GET | `/api/videos` | 올린 영상 목록과 처리 상태 |
 | GET | `/api/videos/{id}` | 영상 하나의 정보와 처리 상태 |
 | GET | `/api/videos/{id}/data` | 화면용 결과 |
+| GET | `/api/videos/{id}/calibration` | 경기장 맞추기 화면용 정보(찍을 수 있는 점·선, 경기장 그림, 저장된 결과) |
 | POST | `/api/videos/{id}/calibration` | 경기장 점 저장 → 위치와 지표 다시 계산 |
 | GET | `/api/videos/{id}/players` | 저장된 기록 묶음 |
 | POST | `/api/videos/{id}/players` | 이은 기록 묶음 저장 → 지표 다시 계산 |
@@ -28,7 +29,8 @@
 - `img`는 영상 픽셀, `pitch`는 경기장 좌표(m, 원점은 경기장 중앙, x는 길이 방향).
 - 위치를 아는 점(`pitch`)은 선이 만나는 곳, 선 위의 점(`line`)은 어느 선 위인지만 아는 점(예: 터치라인 위 아무 곳, `y = ±폭/2`).
 - `model`: `plane`(평면 변환, 점 4개 이상) 또는 `lens`(렌즈 휨까지 맞춤, 위치를 아는 점 9개 이상). 생략하면 파노라마는 `lens`, 스마트폰은 `plane`.
-- 응답: `model`, `points`, `line_points`, `residual_m`(찍은 점에서의 오차: 평균, 최대).
+- `save`: `false`면 저장하지 않고 결과만 돌려준다(찍는 동안 미리 보기). 기본값 `true`.
+- 응답: `model`, `points`, `line_points`, `residual_m`(찍은 점에서의 오차: 평균, 최대), `point_errors_m`(점마다의 오차, 보낸 순서), `overlay`(맞춘 결과로 경기장 선을 화면 좌표로 옮긴 꺾은선), `saved`.
 
 ## 기록 잇기
 
