@@ -215,7 +215,7 @@ window.TLStart = function () {
     z.appendChild(svg('rect', Object.assign({ x: 2, y: 138.4, width: 165, height: 403.2 }, line))); z.appendChild(svg('rect', Object.assign({ x: 883, y: 138.4, width: 165, height: 403.2 }, line)));
     // 빠르게 달린 장면
     const runs = $('runs'); runs.textContent = '';
-    if (!sel.fast_runs.length) runs.appendChild(el('p', 'empty', '초속 ' + P.hsr + 'm를 ' + P.min_sec + '초 이상 넘긴 장면이 없어요.'));
+    if (!sel.fast_runs.length) runs.appendChild(el('p', 'empty', '초속 ' + P.hsr + 'm 이상으로 ' + P.min_sec + '초 넘게 달린 장면이 없어요.'));
     for (const r of sel.fast_runs) {
       const b = el('button', 'run-btn'); b.type = 'button'; const s = el('span'); const st = el('strong', null, C.fmtTime(r.start / fps)); s.appendChild(st);
       s.appendChild(document.createTextNode(' · ' + (r.sprint ? '스프린트' : '고속 달리기') + ' ' + Math.round(r.distance_m) + ' m · ' + r.sec.toFixed(1) + '초 · 평균 ' + r.avg.toFixed(1) + ' m/s')); b.appendChild(s); b.appendChild(el('em', null, '장면 보기'));

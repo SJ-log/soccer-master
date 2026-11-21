@@ -72,7 +72,7 @@ def build(video_id: str, meta: dict, tracks: np.ndarray, calib: dict | None = No
         key='track', label='처리 결과', note=note, has_identity=False, has_positions=bool(calib),
         clip=dict(id=video_id, label=meta['name'], fps=fps, frames=info['frames'], width=info['width'], height=info['height'],
                   video=f'/media/{video_id}/video.mp4', t0=info.get('t0', 0)),
-        pitch=dict(length=pitch[0], width=pitch[1]), params={k: M.PARAMS[k] for k in ('hsr', 'sprint', 'smooth_sec', 'min_sec', 'max_gap', 'grid')},
+        pitch=dict(length=pitch[0], width=pitch[1]), params={k: M.PARAMS[k] for k in ('hsr', 'sprint', 'smooth_sec', 'min_sec', 'merge_sec', 'max_gap', 'grid')},
         calibration=dict(model=calib.get('model', 'plane'), points=calib['points'], line_points=calib.get('line_points', 0), residual_m=calib['residual_m']) if calib else None,
         players=players + raw,
     )

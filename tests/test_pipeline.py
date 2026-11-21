@@ -28,6 +28,20 @@ def test_sprint_is_counted_once():
     assert m['hsr_distance_m'] == pytest.approx(8.0 * 4, rel=0.15)
 
 
+def test_brief_dip_below_threshold_is_still_one_run():
+    # 6 m/s로 2초, 0.4초 동안 5 m/s로 느려졌다가, 다시 6 m/s로 2초: 한 번의 고속 달리기로 센다
+    v = np.concatenate([np.full(75, 2.0), np.full(50, 6.0), np.full(10, 5.0), np.full(50, 6.0), np.full(75, 2.0)])
+    x = np.cumsum(v) / FPS; fr = np.arange(len(x))
+    m, *_ = M.compute(fr, x, np.zeros(len(x)), FPS, params=dict(M.PARAMS, smooth_sec=0.04, pre_median=0))
+    assert m['hsr_count'] == 1 and m['fast_runs'][0]['sec'] == pytest.approx(4.4, abs=0.2)
+    old, *_ = M.compute(fr, x, np.zeros(len(x)), FPS, params=dict(M.PARAMS, smooth_sec=0.04, pre_median=0, merge_sec=0))
+    assert old['hsr_count'] == 2
+    # 2초 동안 느려지면 두 번이다
+    v2 = np.concatenate([np.full(75, 2.0), np.full(50, 6.0), np.full(50, 4.0), np.full(50, 6.0), np.full(75, 2.0)]); x2 = np.cumsum(v2) / FPS
+    m2, *_ = M.compute(np.arange(len(x2)), x2, np.zeros(len(x2)), FPS, params=dict(M.PARAMS, smooth_sec=0.04, pre_median=0))
+    assert m2['hsr_count'] == 2
+
+
 def test_standing_player_with_jitter_does_not_run():
     rng = np.random.default_rng(0); fr = np.arange(750)
     m, *_ = M.compute(fr, rng.normal(0, 0.3, 750), rng.normal(0, 0.3, 750), FPS)
