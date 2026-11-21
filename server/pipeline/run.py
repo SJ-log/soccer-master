@@ -6,7 +6,7 @@ from .. import store
 from . import probe as PR, package
 
 STEPS = [('probe', '영상 검사'), ('prepare', '재생용 준비'), ('detect', '선수 검출'), ('track', '추적'), ('package', '결과 정리')]
-MAX_SEC = float(os.environ.get('TL_MAX_SEC', 600))        # 영상 길이 제한(초)
+MAX_SEC = float(os.environ.get('TL_MAX_SEC', 600))        # 영상 길이 제한(초). 10분 이내만 받는다(11/21 사용자 결정)
 # 개발용: 검출·추적을 돌릴 수 없는 PC에서 화면을 확인할 때, 미리 만든 추적 결과 파일을 대신 쓴다. 실제 서비스에서는 쓰지 않는다.
 DEV_TRACKS = os.environ.get('TL_DEV_TRACKS')
 _gpu = threading.Lock()                                    # 한 번에 한 영상만 처리

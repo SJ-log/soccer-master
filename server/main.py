@@ -29,7 +29,7 @@ def _summary(video_id: str) -> dict:
 
 
 async def list_videos(request):
-    return JSONResponse(dict(videos=store.list_videos()))
+    return JSONResponse(dict(videos=store.list_videos(), limits=dict(max_sec=run.MAX_SEC, max_mb=MAX_MB)))
 
 
 async def upload(request):
