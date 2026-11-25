@@ -39,33 +39,21 @@
     for (const p of players) { const q = posAt(p, f); if (!q) continue; const d = Math.hypot(q[0] - x, q[1] - y); if (d < bd) { bd = d; best = p.id; } }
     return bd <= reach ? best : null;
   }
-  // 비교 대상: 신원이 있으면 같은 팀 필드 선수, 없으면 관측 시간이 비슷한(최장의 80% 이상) 기록
-  function peers(players, sel, hasIdentity) {
-    if (hasIdentity) return players.filter(p => p.team === sel.team && p.role === 0);
-    const mx = Math.max(...players.map(p => p.observed_sec)); return players.filter(p => p.observed_sec >= 0.8 * mx);
-  }
-  const mean = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-  function compare(players, sel, hasIdentity, key) {
-    const g = peers(players, sel, hasIdentity); const avg = mean(g.map(p => p[key])); const max = Math.max(1e-9, ...g.map(p => p[key]), sel[key]);
-    return { avg, max, n: g.length, diffPct: avg > 0 ? (sel[key] - avg) / avg * 100 : 0 };
-  }
   function halves(p) {   // 관측 구간을 앞뒤 절반으로 나눈 이동 거리(m). 1초 평균 속도의 합.
     const v = p.speed_1hz.map(x => x || 0), h = Math.floor(v.length / 2);
     return [v.slice(0, h).reduce((a, b) => a + b, 0), v.slice(h).reduce((a, b) => a + b, 0)];
   }
-  // 수치에 근거한 한 줄 조언. 가장 두드러진 것 하나만 말한다. frame: 근거 장면으로 이동할 프레임(없으면 null)
-  function advice(players, sel, hasIdentity, groupName) {
-    const [h1, h2] = halves(sel); const dist = compare(players, sel, hasIdentity, 'distance_m'), hsr = compare(players, sel, hasIdentity, 'hsr_count');
+  // 수치에 근거한 한 줄 조언. 그 선수 자신의 수치만 본다(다른 기록과 비교하지 않는다. 11/25 결정). 가장 두드러진 것 하나만 말한다.
+  // frame: 근거 장면으로 이동할 프레임(없으면 null)
+  function advice(sel, fps) {
+    const [h1, h2] = halves(sel);
     const run = sel.fast_runs.length ? sel.fast_runs.reduce((a, b) => (b.avg > a.avg ? b : a)) : null;
     const zmax = Math.max(...sel.zone_share.flat());
     if (sel.observed_sec < 30) return { text: '기록이 ' + Math.round(sel.observed_sec) + '초로 짧아서 조언을 만들지 않았어요.', frame: null };
-    if (h1 > 0 && h2 < 0.85 * h1) return { text: '뒤 절반의 이동 거리가 앞 절반보다 ' + Math.round((1 - h2 / h1) * 100) + '% 적었어요. 후반 활동량을 살펴보세요.', frame: sel.speed_f0 + Math.floor(sel.speed_1hz.length / 2) * 25 };
-    if (hsr.n > 1 && sel.hsr_count >= hsr.avg + 1.5) return { text: '고속 달리기가 ' + sel.hsr_count + '회로 ' + groupName + ' 평균(' + hsr.avg.toFixed(1) + '회)보다 많았어요. 가장 빨랐던 장면을 다시 확인해 보세요.', frame: run ? run.start : null };
-    if (dist.n > 1 && dist.diffPct <= -10) return { text: '이동 거리가 ' + groupName + ' 평균보다 ' + Math.round(-dist.diffPct) + '% 적었어요. 공이 없을 때의 움직임을 확인해 보세요.', frame: null };
-    if (dist.n > 1 && dist.diffPct >= 10) return { text: '이동 거리가 ' + groupName + ' 평균보다 ' + Math.round(dist.diffPct) + '% 많았어요. 활동량이 강점이에요.', frame: run ? run.start : null };
+    if (h1 > 0 && h2 < 0.85 * h1) return { text: '뒤 절반의 이동 거리가 앞 절반보다 ' + Math.round((1 - h2 / h1) * 100) + '% 적었어요. 후반 활동량을 살펴보세요.', frame: sel.speed_f0 + Math.floor(sel.speed_1hz.length / 2) * Math.round(fps) };
     if (zmax >= 0.35) return { text: '머문 시간의 ' + Math.round(zmax * 100) + '%가 한 구역에 몰려 있었어요. 활동 구역을 확인해 보세요.', frame: null };
-    if (sel.hsr_count === 0) return { text: '고속 달리기(초속 ' + '5.5m 이상)가 한 번도 없었어요. 속도를 낼 장면이 있었는지 살펴보세요.', frame: null };
-    return { text: '이동 거리와 고속 달리기 모두 ' + groupName + ' 평균과 비슷했어요.', frame: run ? run.start : null };
+    if (!run) return { text: '고속 달리기(초속 ' + '5.5m 이상)가 한 번도 없었어요. 속도를 낼 장면이 있었는지 살펴보세요.', frame: null };
+    return { text: '가장 빨랐던 장면은 ' + fmtTime(run.start / fps) + '쯤이에요(평균 초속 ' + run.avg.toFixed(1) + 'm). 그 장면을 다시 확인해 보세요.', frame: run.start };
   }
   // ---- 기록 잇기 ----
   // 한 선수의 기록 = 조각의 목록 [{track, from, to}] (프레임, 양끝 포함, 시간 순, 서로 겹치지 않음)
@@ -138,6 +126,6 @@
       return out;
     },
   };
-  const api = { NONE, clamp, frameAt, fmtTime, boxAt, posAt, speedAt, pickBox, pickDot, peers, compare, halves, advice, mean, stitch };
+  const api = { NONE, clamp, frameAt, fmtTime, boxAt, posAt, speedAt, pickBox, pickDot, halves, advice, stitch };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TLCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);

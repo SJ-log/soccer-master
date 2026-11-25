@@ -182,28 +182,24 @@ window.TLStart = function () {
 
   // ---------- 리포트 ----------
   function goScene(f) { setView('review'); seekFrame(f); const p = video.play(); if (p && p.catch) p.catch(() => {}); window.scrollTo({ top: 0 }); }
-  function tile(title, value, key, unit, digits, extra) {
+  function tile(title, value, extra) {      // 다른 기록과의 비교(평균, 막대)는 넣지 않는다(11/25 결정)
     const t = el('div', 'tile'); t.appendChild(el('span', null, title)); t.appendChild(el('b', null, value));
-    const group = src.has_identity ? '팀' : '비슷한 길이의 기록', c = C.compare(players, sel, src.has_identity, key);
-    const bar = el('div', 'bar'), fill = el('i'), mark = el('u'); fill.style.width = C.clamp(sel[key] / c.max * 100, 0, 100) + '%'; mark.style.left = C.clamp(c.avg / c.max * 100, 0, 100) + '%'; mark.title = group + ' 평균';
-    bar.appendChild(fill); if (c.n > 1) bar.appendChild(mark); t.appendChild(bar);
-    const diff = c.avg > 0 ? ' (' + (c.diffPct >= 0 ? '+' : '') + Math.round(c.diffPct) + '%)' : '';
-    t.appendChild(el('small', null, (c.n > 1 ? group + ' 평균 ' + c.avg.toFixed(digits) + unit + diff : '비교할 대상이 없어요') + (extra ? ' · ' + extra : '')));
+    if (extra) t.appendChild(el('small', null, extra));
     return t;
   }
   function renderReport() {
     if (!src.has_positions) return;      // 경기장을 맞춘 뒤에만 리포트가 열린다
-    const P = src.params, group = src.has_identity ? '팀' : '비슷한 길이의 기록';
+    const P = src.params;
     $('repClip').textContent = src.clip.label + (src.has_identity ? ' · ' + TEAM[sel.team].name : ' · 추적 결과');
     $('repName').textContent = label(sel) + (src.has_identity ? ' 선수 리포트' : ' 리포트');
     const tt = $('repTitles'); tt.textContent = ''; for (const t of sel.titles) tt.appendChild(el('span', null, t));
-    currentAdvice = C.advice(players, sel, src.has_identity, group); $('repAdvice').textContent = currentAdvice.text; $('adviceBtn').hidden = currentAdvice.frame == null;
+    currentAdvice = C.advice(sel, fps); $('repAdvice').textContent = currentAdvice.text; $('adviceBtn').hidden = currentAdvice.frame == null;
     const tiles = $('repTiles'); tiles.textContent = '';
-    tiles.appendChild(tile('이동 거리', Math.round(sel.distance_m) + ' m', 'distance_m', 'm', 0, C.fmtTime(sel.observed_sec) + ' 관측'));
-    tiles.appendChild(tile('평균 속도', sel.avg_speed.toFixed(2) + ' m/s', 'avg_speed', 'm/s', 2));
-    tiles.appendChild(tile('최고 속도', sel.top_speed.toFixed(2) + ' m/s', 'top_speed', 'm/s', 2, '시속 ' + (sel.top_speed * 3.6).toFixed(1) + 'km'));
-    tiles.appendChild(tile('고속 달리기 (' + P.hsr + ' m/s 이상)', sel.hsr_count + '회 · ' + Math.round(sel.hsr_distance_m) + ' m', 'hsr_count', '회', 1));
-    tiles.appendChild(tile('스프린트 (' + P.sprint.toFixed(1) + ' m/s 이상)', sel.sprint_count + '회', 'sprint_count', '회', 1));
+    tiles.appendChild(tile('이동 거리', Math.round(sel.distance_m) + ' m', C.fmtTime(sel.observed_sec) + ' 관측'));
+    tiles.appendChild(tile('평균 속도', sel.avg_speed.toFixed(2) + ' m/s'));
+    tiles.appendChild(tile('최고 속도', sel.top_speed.toFixed(2) + ' m/s', '시속 ' + (sel.top_speed * 3.6).toFixed(1) + 'km'));
+    tiles.appendChild(tile('고속 달리기 (' + P.hsr + ' m/s 이상)', sel.hsr_count + '회 · ' + Math.round(sel.hsr_distance_m) + ' m'));
+    tiles.appendChild(tile('스프린트 (' + P.sprint.toFixed(1) + ' m/s 이상)', sel.sprint_count + '회'));
     // 활동 구역
     const z = $('zones'); z.textContent = ''; const rows = sel.zone_share.length, cols = sel.zone_share[0].length, cw = 1050 / cols, ch = 680 / rows, zmax = Math.max(1e-9, ...sel.zone_share.flat());
     sel.zone_share.forEach((row, r) => row.forEach((v, c) => {

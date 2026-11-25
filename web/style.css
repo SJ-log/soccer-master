@@ -71,9 +71,6 @@ select{padding:0 10px;border:1px solid #C9CEC9;background:#fff;color:var(--ink)}
 .tile{flex:1 1 220px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px}
 .tile>span{font-size:14px;color:var(--muted)}
 .tile b{font-size:34px}
-.bar{position:relative;height:8px;background:#E6E9E5;border-radius:4px}
-.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--green)}
-.bar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
 .tile small{font-size:13px;color:var(--muted)}
 #zones{width:100%;height:auto;border-radius:8px;background:#EAF1EC}
 .runs{display:flex;flex-direction:column;gap:8px}
