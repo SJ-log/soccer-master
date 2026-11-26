@@ -72,35 +72,70 @@ def test_homography_recovers_pitch_points():
     assert P.to_pitch([[1000, 600]], c) == pytest.approx(P.to_pitch([[1000, 600]], dict(H=H)), abs=0.01)
 
 
+def _panorama(w=1.3, cy=-0.02, size=(4096, 1080), cam=(0.0, 52.0, 11.0), tilt=0.28, pan=0.05):
+    """휘어진 화면(파노라마)을 흉내 낸다: 가까운 쪽 터치라인 뒤 높은 곳의 카메라가 경기장을 내려다보고, 화면의 가로·세로가 각도에 비례한다."""
+    f = np.array([np.sin(pan) * np.cos(tilt), -np.cos(pan) * np.cos(tilt), -np.sin(tilt)]); r = np.array([np.cos(pan), np.sin(pan), 0.0]); down = -np.cross(f, r)
+    M = np.array([r, down, f]) @ np.array([[1, 0, -cam[0]], [0, 1, -cam[1]], [0, 0, -cam[2]]], float)       # 경기장 (X, Y, 1) -> 카메라가 보는 방향
+    return dict(model='lens', H=np.linalg.inv(M).tolist(), lens=dict(w=w, cy=cy, size=list(size)), w_sign=1.0)
+
+
+def _clicks(true, known, on_line=()):
+    pts = [dict(img=i.tolist(), pitch=p.tolist()) for i, p in zip(P.to_image(known, true), np.asarray(known, float))]
+    return pts + [dict(img=i.tolist(), line=dict(axis='y', value=float(p[1]))) for i, p in zip(P.to_image(on_line, true), np.asarray(on_line, float))] if len(on_line) else pts
+
+
+KNOWN13 = [(-52.5, -34), (52.5, -34), (-52.5, 34), (52.5, 34), (0, -34), (0, 34), (0, 0), (0, 9.15), (0, -9.15), (-36, -20.16), (-36, 20.16), (36, -20.16), (36, 20.16)]
+CHECK = np.array([(x, y) for x in np.linspace(-50, 50, 9) for y in np.linspace(-30, 30, 7)], float)
+
+
 def test_lens_fit_beats_plane_on_a_bent_image():
-    """휘어진 화면(파노라마)을 흉내 낸다: 경기장 점을 평면 변환 후 어안 렌즈로 화면에 옮긴다."""
-    import cv2
-    lens = [1600.0, 2400.0, 2000.0, 520.0, -0.07, 0.02]; K = np.array([[lens[0], 0, lens[2]], [0, lens[1], lens[3]], [0, 0, 1.0]]); D = np.array(lens[4:] + [0, 0]).reshape(4, 1)
-    def to_img(pitch):       # 경기장 -> 화면
-        n = np.column_stack([pitch[:, 0] / 60.0, (pitch[:, 1] + 70) / 110.0 - 0.6]); return cv2.fisheye.distortPoints(n.reshape(-1, 1, 2), K, D).reshape(-1, 2)
-    xs = [-52.5, -36, 0, 36, 52.5]; ys = [-34, -20.16, 0, 20.16, 34]
-    known = np.array([(x, y) for x in xs for y in ys if (x, y) not in ((-36, 0), (36, 0))], float)            # 선이 만나는 곳 23개
-    on_line = np.array([(x, y) for y in (-34, 34) for x in np.linspace(-45, 45, 7)], float)                    # 터치라인 위 14개
-    pts = [dict(img=i.tolist(), pitch=p.tolist()) for i, p in zip(to_img(known), known)]
-    pts += [dict(img=i.tolist(), line=dict(axis='y', value=float(p[1]))) for i, p in zip(to_img(on_line), on_line)]
-    check = np.array([(x, y) for x in np.linspace(-50, 50, 9) for y in np.linspace(-30, 30, 7)], float)
-    err = lambda c: float(np.hypot(*(P.to_pitch(to_img(check), c) - check).T).max())
-    lens_fit = P.fit(pts, 'lens', (4096, 1080)); plane_fit = P.fit(pts, 'plane')
-    assert lens_fit['line_points'] == 14 and lens_fit['points'] == 23
-    assert err(lens_fit) < 0.3 < err(plane_fit)
+    true = _panorama(); on_line = [(x, y) for y in (-34, 34) for x in np.linspace(-45, 45, 7)]                 # 터치라인 위 14개
+    pts = _clicks(true, KNOWN13, on_line)
+    assert (P.to_image(KNOWN13, true)[:, 0] > 0).all() and (P.to_image(KNOWN13, true)[:, 0] < 4096).all()       # 찍는 점이 화면 안에 있는 설정인지
+    err = lambda c: float(np.hypot(*(P.to_pitch(P.to_image(CHECK, true), c) - CHECK).T).max())
+    lens_fit = P.fit(pts, 'lens', (4096, 1080)); plane_fit = P.fit(pts, 'plane', (4096, 1080))
+    assert lens_fit['line_points'] == 14 and lens_fit['points'] == 13
+    assert err(lens_fit) < 0.05 and err(plane_fit) > 1.0
+    assert lens_fit['lens']['w'] == pytest.approx(1.3, abs=0.01) and lens_fit['lens']['cy'] == pytest.approx(-0.02, abs=0.002)
+
+
+def test_lens_fit_with_nine_points_on_another_camera():
+    true = _panorama(w=1.55, cy=0.01, size=(3840, 1504)); pts = _clicks(true, KNOWN13[:9])
+    c = P.fit(pts, 'lens', (3840, 1504))
+    assert float(np.hypot(*(P.to_pitch(P.to_image(CHECK, true), c) - CHECK).T).max()) < 0.05
+
+
+def test_lens_fit_is_steady_when_clicks_wobble():
+    """찍는 위치가 3px씩 흔들려도 경기장 안의 거리가 거의 그대로여야 한다(11/25 안정화의 기준)."""
+    true = _panorama(); rng = np.random.default_rng(0); px = P.to_image(CHECK, true); scale = []
+    base = _clicks(true, KNOWN13, [(x, y) for y in (-34, 34) for x in np.linspace(-45, 45, 9)])
+    for _ in range(8):
+        pts = [dict(p, img=(np.array(p['img']) + rng.normal(0, 3, 2)).tolist()) for p in base]
+        q = P.to_pitch(px, P.fit(pts, 'lens', (4096, 1080))); scale.append(np.hypot(*(q[1:] - q[:-1]).T) / np.hypot(*(CHECK[1:] - CHECK[:-1]).T))
+    e = np.abs(np.array(scale) - 1)
+    assert e.mean() < 0.015 and e.max() < 0.06                # 이웃한 점 사이 거리의 오차: 평균 1.5%, 최대 6% 안
+
+
+def test_one_bad_click_is_flagged_not_followed():
+    true = _panorama(); pts = _clicks(true, KNOWN13, [(x, y) for y in (-34, 34) for x in np.linspace(-45, 45, 9)])
+    pts[9] = dict(pts[9], img=[pts[9]['img'][0] + 60, pts[9]['img'][1] + 25])                                    # 한 점을 크게 잘못 찍음
+    c = P.fit(pts, 'lens', (4096, 1080)); e = c['point_errors_m']
+    assert e[9] == max(e) and e[9] > 2.0                                                                         # 그 점이 가장 크게 어긋난 점으로 드러난다
+    assert float(np.median(np.hypot(*(P.to_pitch(P.to_image(CHECK, true), c) - CHECK).T))) < 0.3                 # 나머지는 거의 그대로
 
 
 def test_to_image_is_the_inverse_of_to_pitch():
-    import cv2
-    lens = [1600.0, 2400.0, 2000.0, 520.0, -0.07, 0.02]; K = np.array([[lens[0], 0, lens[2]], [0, lens[1], lens[3]], [0, 0, 1.0]]); D = np.array(lens[4:] + [0, 0]).reshape(4, 1)
-    to_img = lambda pitch: cv2.fisheye.distortPoints(np.column_stack([pitch[:, 0] / 60.0, (pitch[:, 1] + 70) / 110.0 - 0.6]).reshape(-1, 1, 2), K, D).reshape(-1, 2)
-    known = np.array([(x, y) for x in (-52.5, -36, 0, 36, 52.5) for y in (-34, -20.16, 0, 20.16, 34)], float)
-    pts = [dict(img=i.tolist(), pitch=p.tolist()) for i, p in zip(to_img(known), known)]
+    true = _panorama(); pts = _clicks(true, KNOWN13)
     check = np.array([(x, y) for x in np.linspace(-50, 50, 5) for y in np.linspace(-30, 30, 4)], float)
     for model in ('lens', 'plane'):
         c = P.fit(pts, model, (4096, 1080))
         assert P.to_pitch(P.to_image(check, c), c) == pytest.approx(check, abs=0.05)
         assert len(c['point_errors_m']) == len(pts)
+
+
+def test_old_lens_result_is_not_current():
+    assert not P.is_current(dict(model='lens', H=np.eye(3).tolist(), lens=[1600.0, 2400.0, 2000.0, 520.0, -0.07, 0.02]))
+    assert P.is_current(dict(model='plane', H=np.eye(3).tolist(), lens=None)) and P.is_current(_panorama())
 
 
 def test_pitch_landmarks_and_shapes():
@@ -116,9 +151,11 @@ def test_pitch_landmarks_and_shapes():
 
 
 def test_lens_needs_nine_points_and_bad_line_is_rejected():
-    pts = [dict(img=[i * 100, i * 37 % 500], pitch=[i, i]) for i in range(8)]
+    pts = [dict(img=[i * 100, i * 37 % 500], pitch=[i, i * i % 7]) for i in range(8)]
     with pytest.raises(ValueError):
         P.fit(pts, 'lens')
+    with pytest.raises(ValueError):
+        P.fit([dict(img=[i * 100, i * 37 % 500], pitch=[i, i]) for i in range(12)], 'lens')     # 경기장에서 한 줄로 늘어선 점
     with pytest.raises(ValueError):
         P.fit(pts + [dict(img=[1, 2], line=dict(axis='z', value=0))], 'plane')
 

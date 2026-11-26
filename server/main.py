@@ -78,6 +78,7 @@ async def get_data(request):
         return err('영상을 찾을 수 없습니다', 404)
     if not p.exists():
         return err('아직 처리 결과가 없습니다', 404)
+    run.calibration(request.path_params['id'])       # 예전 방식으로 맞춘 영상이면 여기서 다시 맞춰 결과를 새로 만든다
     return FileResponse(p, media_type='application/json')
 
 
@@ -117,7 +118,7 @@ async def get_calibration(request):
         meta = None
     if meta is None or 'video' not in meta:
         return err('영상을 찾을 수 없습니다', 404)
-    L, Wd = meta['pitch']['length'], meta['pitch']['width']; calib = store.read(video_id, 'calibration.json')
+    L, Wd = meta['pitch']['length'], meta['pitch']['width']; calib = run.calibration(video_id)
     return JSONResponse(dict(
         name=meta['name'], kind=meta['kind'], default_model='lens' if meta['kind'] == 'panorama' else 'plane', min_points=positions.MIN_POINTS,
         video=dict(meta['video'], url=f'/media/{video_id}/video.mp4'), pitch=meta['pitch'],

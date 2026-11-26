@@ -3,7 +3,7 @@ import os, shutil, threading, time, traceback
 from pathlib import Path
 import numpy as np
 from .. import store
-from . import probe as PR, package
+from . import probe as PR, package, positions
 
 STEPS = [('probe', '영상 검사'), ('prepare', '재생용 준비'), ('detect', '선수 검출'), ('track', '추적'), ('package', '결과 정리')]
 MAX_SEC = float(os.environ.get('TL_MAX_SEC', 600))        # 영상 길이 제한(초). 10분 이내만 받는다(11/21 사용자 결정)
@@ -20,11 +20,25 @@ def _step(video_id, key, progress=0.0):
     _job(video_id, state='running', step=key, step_label=dict(STEPS)[key], progress=round(float(progress), 3))
 
 
+def calibration(video_id: str):
+    """저장된 경기장 맞춤 결과(없으면 None). 예전 방식(11/25 전의 lens)으로 저장된 것은 찍어 둔 점으로 다시 맞추고, 화면용 결과도 다시 만든다."""
+    calib = store.read(video_id, 'calibration.json')
+    if calib is None or positions.is_current(calib):
+        return calib
+    try:
+        meta = store.read(video_id, 'meta.json'); raw = calib.get('points_raw') or []
+        calib = dict(positions.fit(raw, calib.get('model') or 'lens', (meta['video']['width'], meta['video']['height'])), points_raw=raw)
+    except (ValueError, KeyError, TypeError):
+        return None                     # 다시 맞출 수 없으면 맞추지 않은 영상으로 본다(경기장 맞추기 화면에서 다시 찍는다)
+    store.write(video_id, 'calibration.json', calib); rebuild(video_id)
+    return calib
+
+
 def rebuild(video_id: str) -> dict:
     """추적 결과와 (있다면) 경기장 변환·이은 묶음으로 화면용 결과를 다시 만든다."""
     d = store.video_dir(video_id); meta = store.read(video_id, 'meta.json')
     tracks = np.loadtxt(d / 'tracks.txt', delimiter=',').reshape(-1, 6)
-    calib = store.read(video_id, 'calibration.json'); groups = (store.read(video_id, 'players.json') or {}).get('players')
+    calib = calibration(video_id); groups = (store.read(video_id, 'players.json') or {}).get('players')
     data = package.build(video_id, meta, tracks, calib, groups); store.write(video_id, 'data.json', data); return data
 
 
